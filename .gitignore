@@ -1,0 +1,62 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+
+# ML / Data (CRITICAL)
+
+datasets/
+data/
+*.h5
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.pickle
+*.pkl
+
+# Large files
+*.wav
+*.mp3
+*.flac
+
+# Logs & outputs
+logs/
+outputs/
+results/
+*.log
+
+
+# Jupyter
+.ipynb_checkpoints/
+
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Environment variables
+.env
+
+# Build / cache
+build/
+dist/
+*.egg-info/
+
+
+# Docker
+*.tar
+
+# Misc
+coverage/
