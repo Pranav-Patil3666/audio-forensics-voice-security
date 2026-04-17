@@ -28,6 +28,7 @@ data/
 *.wav
 *.mp3
 *.flac
+*.png
 
 # Logs & outputs
 logs/
@@ -60,3 +61,8 @@ dist/
 
 # Misc
 coverage/
+
+ml/features/
+ml/data/
+ml/models/
+ml/outputs/
