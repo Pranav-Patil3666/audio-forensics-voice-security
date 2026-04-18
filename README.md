@@ -17,3 +17,13 @@ Real-time detection of synthetic (AI-generated) voice using spectrogram-based an
 - backend/ → API layer
 - ml/ → models + training
 - streaming/ → real-time audio ingestion
+
+## full Architecture
+
+    Call ingress (Twilio / SIP / VoIP)
+            ↓
+    Realtime backend (WebSocket + API + orchestration)
+            ↓
+    ML inference service (chunking, spectrogram, model, risk)
+            ↓
+    Dashboard + storage + alerts
