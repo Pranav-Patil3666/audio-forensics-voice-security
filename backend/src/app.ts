@@ -4,6 +4,7 @@ import cors from "cors";
 import healthRoutes from "./routes/health.routes.js";
 import dbRoutes from "./routes/db.routes.js";
 import mlRoutes from "./routes/ml.routes.js";
+import streamRoutes from "./routes/stream.routes.js";
 
 const app = express();
 
@@ -15,5 +16,6 @@ app.use(express.json());
 app.use("/api/health", healthRoutes);
 app.use("/api/db", dbRoutes);
 app.use("/api/ml", mlRoutes);
+app.use("/api/stream", streamRoutes);
 
 export default app;
