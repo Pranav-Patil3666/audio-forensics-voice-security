@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 
 /**
- * Splits audio into 2-second chunks using FFmpeg
+ * Splits audio into overlapping chunks using FFmpeg
  * @param inputPath - path to input audio file
  * @param outputDir - directory to store chunks
  * @returns array of chunk file paths (sorted)
@@ -11,54 +11,88 @@ import path from "path";
 export const splitAudio = (inputPath: string, outputDir: string): Promise<string[]> => {
   return new Promise((resolve, reject) => {
     try {
-      // 🔥 Ensure input exists
+      // =========================
+      // VALIDATION
+      // =========================
       if (!fs.existsSync(inputPath)) {
         return reject(new Error("Input audio file not found"));
       }
 
-      // 🔥 Create output dir if not exists
       if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
       }
 
-      // 🔥 Clean previous chunks (VERY IMPORTANT)
+      // =========================
+      // CLEAN OLD FILES
+      // =========================
       const existingFiles = fs.readdirSync(outputDir);
       for (const file of existingFiles) {
         fs.unlinkSync(path.join(outputDir, file));
       }
 
-      // 🔥 Normalize paths (important for Windows)
       const input = path.resolve(inputPath);
-      const outputPattern = path.join(outputDir, "chunk_%03d.wav");
 
-      // 🔥 FFmpeg command
-      const command = `ffmpeg -y -i "${input}" -f segment -segment_time 2 -acodec pcm_s16le "${outputPattern}"`;
+      console.log("🎧 Getting audio duration...");
 
-      console.log("🎧 Splitting audio into chunks...");
+      // =========================
+      // STEP 1: GET DURATION
+      // =========================
+      const probeCmd = `ffprobe -i "${input}" -show_entries format=duration -v quiet -of csv="p=0"`;
 
-      exec(command, (error, stdout, stderr) => {
-        if (error) {
-          console.error("FFmpeg error:", stderr);
-          return reject(error);
+      exec(probeCmd, (err, stdout) => {
+        if (err) return reject(err);
+
+        const totalDuration = parseFloat(stdout.trim());
+
+        if (!totalDuration || isNaN(totalDuration)) {
+          return reject(new Error("Could not determine audio duration"));
         }
 
-        // 🔥 Read generated chunks
-        let files = fs.readdirSync(outputDir);
+        console.log(`⏱ Audio Duration: ${totalDuration}s`);
 
-        if (files.length === 0) {
-          return reject(new Error("No chunks generated"));
-        }
+        // =========================
+        // CHUNK CONFIG
+        // =========================
+        const chunkDuration = 2; // seconds
+        const step = 1; // 🔥 50% overlap (2 sec chunk → move 1 sec)
 
-        // 🔥 Sort properly (VERY IMPORTANT)
-        files = files.sort();
+        let start = 0;
+        let index = 0;
 
-        const chunkPaths = files.map((file) =>
-          path.join(outputDir, file)
-        );
+        const chunkPaths: string[] = [];
 
-        console.log(`✅ Generated ${chunkPaths.length} chunks`);
+        // =========================
+        // GENERATE CHUNKS RECURSIVELY
+        // =========================
+        const generateChunk = () => {
+          if (start >= totalDuration) {
+            console.log(`✅ Generated ${chunkPaths.length} chunks`);
+            return resolve(chunkPaths);
+          }
 
-        resolve(chunkPaths);
+          const outputPath = path.join(outputDir, `chunk_${String(index).padStart(3, "0")}.wav`);
+
+          const cmd = `ffmpeg -y -i "${input}" -ss ${start} -t ${chunkDuration} -acodec pcm_s16le "${outputPath}"`;
+
+          exec(cmd, (error) => {
+            if (error) {
+              console.error("FFmpeg error:", error);
+              return reject(error);
+            }
+
+            chunkPaths.push(outputPath);
+
+            // 🔥 KEY CHANGE → overlapping shift
+            start += step;
+            index++;
+
+            generateChunk();
+          });
+        };
+
+        console.log("🎧 Splitting audio into overlapping chunks...");
+
+        generateChunk();
       });
 
     } catch (err) {
