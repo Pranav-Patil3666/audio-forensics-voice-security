@@ -15,6 +15,7 @@ SRC_DIR = os.path.join(BASE_DIR, "src")
 sys.path.append(SRC_DIR)
 
 from model import CNNModel
+from vad import is_speech
 
 app = FastAPI()
 
@@ -40,6 +41,10 @@ print("✅ ML model loaded")
 def audio_to_tensor(file_bytes):
     try:
         y, sr = librosa.load(io.BytesIO(file_bytes), sr=16000)
+        
+        #🔥 VAD check   
+        if not is_speech(y, sr):
+            return None
 
         # 🔥 Mel Spectrogram (same as training)
         S = librosa.feature.melspectrogram(
@@ -78,7 +83,15 @@ async def predict(file: UploadFile = File(...)):
     try:
         contents = await file.read()
 
-        image = audio_to_tensor(contents).to(device)
+        image = audio_to_tensor(contents)
+
+        # 🔥 skip non-speech
+        if image is None:
+            return {
+                "skip": True
+            }
+
+        image = image.to(device)
 
         with torch.no_grad():
             outputs = model(image)

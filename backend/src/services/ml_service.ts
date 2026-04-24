@@ -15,8 +15,28 @@ export const sendToML = async (filePath: string) => {
       }
     );
 
-    return response.data;
+    const data = response.data;
+
+    // 🔥 STEP 1: HANDLE VAD SKIP
+    if (data.skip) {
+      return null;
+    }
+
+    // 🔥 STEP 2: NORMALIZE OUTPUT
+    const real = data.real ?? 0;
+    const fake = data.fake ?? 0;
+
+    const label = fake > real ? "FAKE" : "REAL";
+    const confidence = Math.max(real, fake);
+
+    return {
+      label,
+      confidence,
+      fake_prob: fake, // 🔥 IMPORTANT: used in risk engine
+    };
+
   } catch (error: any) {
-    throw new Error("ML service error: " + error.message);
+    console.error("❌ ML service error:", error.message);
+    return null; // 🔥 fail-safe (don’t crash stream)
   }
 };

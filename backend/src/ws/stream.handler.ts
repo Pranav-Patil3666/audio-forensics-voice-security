@@ -6,6 +6,8 @@ import fs from "fs";
 export const initWebSocket = (server: any) => {
   const wss = new WebSocketServer({ server });
 
+  wss.setMaxListeners(20);
+
   wss.on("connection", (ws: WebSocket) => {
     console.log("🔌 Client connected");
 
@@ -20,7 +22,13 @@ export const initWebSocket = (server: any) => {
 
           const result = await sendToML(filePath);
 
-          const fakeProb = result.fake_prob || result.fake || 0;
+          // 🔥 SKIP NON-SPEECH CHUNKS
+          if (!result) {
+            fs.unlinkSync(filePath);
+            return;
+          }
+
+          const fakeProb = result.fake_prob || 0;
 
           // 🔥 compute rolling risk
           const risk = riskEngine.addPrediction(fakeProb);
