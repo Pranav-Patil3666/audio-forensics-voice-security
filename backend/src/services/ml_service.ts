@@ -16,19 +16,22 @@ export const sendToML = async (filePath: string) => {
     );
 
     const data = response.data;
+    console.log("ML RAW RESPONSE:", data);
 
     // 🔥 STEP 1: HANDLE VAD SKIP
     if (data.skip) {
+      console.log("⛔ Skipped by VAD");
       return null;
     }
 
     // 🔥 STEP 2: NORMALIZE OUTPUT
-    const real = data.real ?? 0;
-    const fake = data.fake ?? 0;
+    const real = data.real_prob ?? 0;
+    const fake = data.fake_prob ?? 0;
 
     const label = fake > real ? "FAKE" : "REAL";
     const confidence = Math.max(real, fake);
 
+    
     return {
       label,
       confidence,

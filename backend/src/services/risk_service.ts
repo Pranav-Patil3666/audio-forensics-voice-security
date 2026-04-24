@@ -1,45 +1,78 @@
 export class RiskEngine {
   private history: number[] = [];
-  private maxHistory = 5;
+  private maxWindow = 5;
 
-  /**
-   * Add new prediction and compute risk
-   */
+  private smoothedScore: number | null = null;
+
+  // thresholds (tune later)
+  private HIGH_THRESHOLD = 0.75;
+  private MEDIUM_THRESHOLD = 0.5;
+
   addPrediction(fakeProb: number) {
+
+    // 1. UPDATE HISTORY
+
     this.history.push(fakeProb);
 
-    // keep sliding window
-    if (this.history.length > this.maxHistory) {
+    if (this.history.length > this.maxWindow) {
       this.history.shift();
     }
 
-    return this.getRisk();
+    // 2. EXPONENTIAL SMOOTHING
+
+    if (this.smoothedScore === null) {
+      this.smoothedScore = fakeProb;
+    } else {
+      this.smoothedScore = 0.6 * fakeProb + 0.4 * this.smoothedScore;
+    }
+
+    // =========================
+    // 3. CONSISTENCY LOGIC
+    // =========================
+    const highFakeCount = this.history.filter(
+      (v) => v > this.HIGH_THRESHOLD
+    ).length;
+
+    // =========================
+    // 4. SPIKE DETECTION
+    // =========================
+    let spike = false;
+
+    if (this.history.length >= 2) {
+      const last = this.history[this.history.length - 1];
+      const prev = this.history[this.history.length - 2];
+
+      if (Math.abs(last - prev) > 0.5) {
+        spike = true;
+      }
+    }
+
+
+    // 5. FINAL RISK DECISION
+
+    let risk = "LOW";
+
+    // strong signal
+    if (highFakeCount >= 3) {
+      risk = "HIGH";
+    }
+    // medium signal
+    else if (this.smoothedScore > this.MEDIUM_THRESHOLD) {
+      risk = "MEDIUM";
+    }
+
+    // spike increases suspicion
+    if (spike && risk === "LOW") {
+      risk = "MEDIUM";
+    }
+
+    return risk;
   }
 
-  /**
-   * Compute risk based on rolling average
-   */
-  getRisk() {
-    if (this.history.length === 0) return "LOW";
-
-    const avg =
-      this.history.reduce((a, b) => a + b, 0) / this.history.length;
-
-    if (avg > 0.85) return "HIGH";
-    if (avg > 0.65) return "MEDIUM";
-    return "LOW";
-  }
-
-  /**
-   * Debug info
-   */
   getStats() {
-    const avg =
-      this.history.reduce((a, b) => a + b, 0) / this.history.length;
-
     return {
       history: this.history,
-      avg: avg || 0,
+      smoothed: this.smoothedScore,
     };
   }
 }
