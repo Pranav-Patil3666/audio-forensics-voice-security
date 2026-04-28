@@ -55,7 +55,7 @@ def audio_to_spectrogram(audio_path):
     fig.canvas.draw()
 
     # Convert to numpy array
-    image = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    image = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)  
     image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     plt.close(fig)
 
