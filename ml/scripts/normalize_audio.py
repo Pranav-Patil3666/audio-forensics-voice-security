@@ -1,17 +1,26 @@
 import os
 import subprocess
+from pathlib import Path
 
-INPUT_DIR = "../data/yt/raw_yt"
-OUTPUT_DIR = "../data/yt/processed_yt"
+INPUT_DIR = Path("../data/yt/raw_yt")
+OUTPUT_DIR = Path("../data/yt/processed_yt")
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-for file in os.listdir(INPUT_DIR):
-    if file.endswith(".wav"):
-        inp = os.path.join(INPUT_DIR, file)
-        out = os.path.join(OUTPUT_DIR, file)
+for file in INPUT_DIR.glob("*.wav"):
+    out_file = OUTPUT_DIR / file.name
 
-        cmd = f'ffmpeg -y -i "{inp}" -ar 16000 -ac 1 "{out}"'
-        subprocess.run(cmd, shell=True)
+    print(f"🎧 Normalizing: {file.name}")
 
-print("✅ Normalization done")
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i", str(file),
+        "-ar", "16000",
+        "-ac", "1",
+        str(out_file)
+    ]
+
+    subprocess.run(cmd)
+
+print("✅ Normalization complete")
