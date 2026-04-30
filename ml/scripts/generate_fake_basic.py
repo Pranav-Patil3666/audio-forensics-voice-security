@@ -3,45 +3,103 @@ import librosa
 import numpy as np
 import soundfile as sf
 import random
+import subprocess
+from pathlib import Path
 
 BASE = r"D:\ml-project\Audio Forensics for Voice Security\ml"
 
-real_dir = os.path.join(BASE, "data", "real", "hindi")
-fake_dir = os.path.join(BASE, "data", "fake", "basic")
+# ✅ INPUT (processed real data)
+real_dir = os.path.join(BASE, "data", "processed", "real", "common_voice")
 
+# ✅ OUTPUT (fixed)
+fake_dir = os.path.join(BASE, "data", "processed", "fake", "augmented")
 os.makedirs(fake_dir, exist_ok=True)
 
 files = os.listdir(real_dir)
 
-for i, file in enumerate(files[:1000]):
+TARGET_FAKE = 5000  # 🔥 increase scale
+generated = 0
+
+print("🚀 Generating augmented fake data...")
+
+while generated < TARGET_FAKE:
+    file = random.choice(files)
     path = os.path.join(real_dir, file)
 
     try:
-        y, sr = librosa.load(path, sr=None, mono=True)
+        y, sr = librosa.load(path, sr=16000, mono=True)
 
-        # 🔥 SAFE transformations ONLY
-        choice = random.choice(["noise", "volume", "crop"])
+        # 🔥 choose transformation type
+        choice = random.choice([
+            "noise",
+            "pitch",
+            "speed",
+            "volume",
+            "crop",
+            "compression"
+        ])
 
+        # =========================
+        # AUGMENTATIONS
+        # =========================
         if choice == "noise":
-            noise = np.random.randn(len(y)) * 0.003
+            noise = np.random.randn(len(y)) * random.uniform(0.002, 0.01)
             y_mod = y + noise
 
+        elif choice == "pitch":
+            steps = random.uniform(-3, 3)
+            y_mod = librosa.effects.pitch_shift(y, sr=sr, n_steps=steps)
+
+        elif choice == "speed":
+            rate = random.uniform(0.8, 1.25)
+            y_mod = librosa.effects.time_stretch(y, rate) # type: ignore
+
         elif choice == "volume":
-            factor = random.uniform(0.5, 1.5)
+            factor = random.uniform(0.4, 1.6)
             y_mod = y * factor
 
-        else:  # crop / truncate (simulates call cuts)
-            start = random.randint(0, len(y)//4)
-            end = start + int(len(y) * 0.7)
-            y_mod = y[start:end]
+        elif choice == "crop":
+            if len(y) > sr * 2:
+                start = random.randint(0, len(y) - sr)  # type: ignore
+                y_mod = y[start:start + int(sr * random.uniform(1.5, 3))]
+            else:
+                y_mod = y
 
-        # normalize
+        elif choice == "compression":
+            # temporary file
+            temp_in = "temp_in.wav"
+            temp_out = "temp_out.wav"
+
+            sf.write(temp_in, y, sr)
+
+            bitrate = random.choice(["16k", "32k", "64k"])
+            cmd = f'ffmpeg -loglevel error -y -i "{temp_in}" -b:a {bitrate} "{temp_out}"'
+            subprocess.run(cmd, shell=True)
+
+            if os.path.exists(temp_out):
+                y_mod, sr = librosa.load(temp_out, sr=16000, mono=True)
+                os.remove(temp_in)
+                os.remove(temp_out)
+            else:
+                y_mod = y
+
+        # =========================
+        # NORMALIZATION
+        # =========================
         y_mod = y_mod / (np.max(np.abs(y_mod)) + 1e-6)
 
-        out_path = os.path.join(fake_dir, f"fake_{i}.wav")
-        sf.write(out_path, y_mod, sr)
+        # =========================
+        # SAVE
+        # =========================
+        out_path = os.path.join(fake_dir, f"fake_{generated}.wav")
+        sf.write(out_path, y_mod, 16000)
+
+        generated += 1
+
+        if generated % 500 == 0:
+            print(f"Generated: {generated}")
 
     except Exception as e:
-        print(f"Skipping {file}: {e}")
+        continue
 
-print("✅ Basic synthetic dataset created (stable)")
+print(f"✅ Generated {generated} augmented fake samples")
