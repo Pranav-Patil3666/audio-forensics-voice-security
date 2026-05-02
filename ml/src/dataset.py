@@ -1,39 +1,67 @@
-import pandas as pd
-import torch
-from torch.utils.data import Dataset
-from PIL import Image
-from torchvision import transforms
 import os
+import torch
+import librosa
+import numpy as np
+from torch.utils.data import Dataset
 
+class AudioDataset(Dataset):
+    def __init__(self, root_dir, sr=16000, duration=2):
+        self.samples = []
+        self.sr = sr
+        self.max_len = sr * duration
 
-class SpectrogramDataset(Dataset):
-    def __init__(self, csv_file):
-        self.data = pd.read_csv(csv_file)
+        for label, class_name in enumerate(["real", "fake"]):
+            class_dir = os.path.join(root_dir, class_name)
 
-        # Pre-extract columns (faster than iloc every time)
-        self.paths = self.data["path"].values
-        self.labels = self.data["label"].values
+            for file in os.listdir(class_dir):
+                if file.endswith(".wav") or file.endswith(".flac"):
+                    path = os.path.join(class_dir, file)
+                    self.samples.append((path, label))
 
-        self.transform = transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5], std=[0.5])
-        ])
+        print(f"Loaded {len(self.samples)} samples from {root_dir}")
 
     def __len__(self):
-        return len(self.paths)
+        return len(self.samples)
 
     def __getitem__(self, idx):
-        img_path = self.paths[idx]
-        label = int(self.labels[idx])
+        path, label = self.samples[idx]
 
-        try:
-            image = Image.open(img_path).convert("L")
-        except Exception:
-            # 🔥 fallback (very important for stability)
-            # create dummy image instead of crashing
-            image = Image.new("L", (224, 224))
+        # =========================
+        # LOAD AUDIO
+        # =========================
+        y, sr = librosa.load(path, sr=self.sr, mono=True)
 
-        image = self.transform(image)
+        # =========================
+        # FIX LENGTH (IMPORTANT)
+        # =========================
+        if len(y) < self.max_len:
+            pad = self.max_len - len(y)
+            y = np.pad(y, (0, pad))
+        else:
+            y = y[:self.max_len]
 
-        return image, torch.tensor(label, dtype=torch.long)
+        # =========================
+        # MEL SPECTROGRAM
+        # =========================
+        mel = librosa.feature.melspectrogram(
+            y=y,
+            sr=self.sr,
+            n_mels=128,
+            n_fft=1024,
+            hop_length=512
+        )
+
+        mel = librosa.power_to_db(mel, ref=np.max)
+
+        # =========================
+        # NORMALIZE (CRITICAL)
+        # =========================
+        mel = (mel - mel.mean()) / (mel.std() + 1e-6)
+
+        # =========================
+        # TO TENSOR
+        # =========================
+        mel = torch.tensor(mel).unsqueeze(0).float()  # (1, 128, T)
+        label = torch.tensor(label).long()
+
+        return mel, label
