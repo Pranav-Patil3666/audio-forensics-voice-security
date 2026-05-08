@@ -33,11 +33,13 @@ def main():
     # DATASETS
     # =========================
     train_dataset = AudioDataset(
-        f"{BASE}/data/final/train"
+        f"{BASE}/data/final/train",
+        augment=True
     )
 
     val_dataset = AudioDataset(
-        f"{BASE}/data/final/val"
+        f"{BASE}/data/final/val",
+        augment=False
     )
 
     # =========================
