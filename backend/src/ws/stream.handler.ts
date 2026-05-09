@@ -23,7 +23,7 @@ export const initWebSocket = (server: any) => {
           const result = await sendToML(filePath);
 
           // 🔥 SKIP NON-SPEECH CHUNKS
-          if (!result) {
+          if (!result || result.skip) {
             fs.unlinkSync(filePath);
             return;
           }

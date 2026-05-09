@@ -18,20 +18,20 @@ from model import CNNModel
 
 def main():
 
-    # =========================
+    
     # PATHS
-    # =========================
+    
     BASE = r"D:\ml-project\Audio Forensics for Voice Security\ml"
 
-    # =========================
+    
     # DEVICE
-    # =========================
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Using device:", device)
 
-    # =========================
+    
     # DATASETS
-    # =========================
+    
     train_dataset = AudioDataset(
         f"{BASE}/data/final/train",
         augment=True
@@ -42,9 +42,9 @@ def main():
         augment=False
     )
 
-    # =========================
+
     # WEIGHTED SAMPLER
-    # =========================
+
     print("📊 Computing balanced sampling weights...")
 
     labels = [sample[1] for sample in train_dataset.samples]
@@ -67,9 +67,9 @@ def main():
         replacement=True
     )
 
-    # =========================
+ 
     # DATALOADERS
-    # =========================
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=32,
@@ -88,46 +88,46 @@ def main():
         drop_last=False
     )
 
-    # =========================
+    
     # MODEL
-    # =========================
+    
     model = CNNModel().to(device)
 
-    # =========================
+    
     # LOSS
-    # =========================
+    
     criterion = nn.CrossEntropyLoss(
         label_smoothing=0.05
     )
 
-    # =========================
+    
     # OPTIMIZER
-    # =========================
+    
     optimizer = optim.AdamW(     # type: ignore
         model.parameters(),
         lr=1e-3,
         weight_decay=1e-4
     )
 
-    # =========================
+    
     # SCHEDULER
-    # =========================
+    
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer,
         T_max=10
     )
 
-    # =========================
+    
     # TRAINING CONFIG
-    # =========================
+    
     EPOCHS = 20
     best_auc = 0.0
 
     scaler = torch.amp.GradScaler("cuda")    # type: ignore
 
-    # =========================
+    
     # TRAIN LOOP
-    # =========================
+    
     for epoch in range(EPOCHS):
 
         model.train()
@@ -141,18 +141,18 @@ def main():
 
             optimizer.zero_grad()
 
-            # =====================
+            # =
             # MIXED PRECISION
-            # =====================
+            # =
             with torch.amp.autocast("cuda"):     # type: ignore
 
                 outputs = model(x)
 
                 loss = criterion(outputs, y)
 
-            # =====================
+
             # BACKPROP
-            # =====================
+  
             scaler.scale(loss).backward()
 
             # gradient clipping
@@ -168,9 +168,9 @@ def main():
 
         avg_loss = total_loss / len(train_loader)
 
-        # =========================
+        
         # VALIDATION
-        # =========================
+        
         model.eval()
 
         preds = []
@@ -222,9 +222,9 @@ def main():
         except Exception:
             auc = 0.0
 
-        # =========================
+        
         # SAVE BEST
-        # =========================
+        
         if auc > best_auc:
 
             best_auc = auc
@@ -247,9 +247,9 @@ def main():
             f"| AUC: {auc:.4f}"
         )
 
-    # =========================
+    
     # SAVE FINAL
-    # =========================
+    
     torch.save(
         model.state_dict(),
         os.path.join(
