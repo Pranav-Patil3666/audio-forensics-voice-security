@@ -71,7 +71,7 @@ def load_audio(
     if normalize:
         y = normalize_audio(y)
 
-    return y, sr
+    return y, sr   #type: ignore[return-value]
 
 
 def normalize_audio(y: np.ndarray) -> np.ndarray:
