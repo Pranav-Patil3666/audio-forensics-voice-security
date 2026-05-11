@@ -20,10 +20,15 @@ Real-time detection of synthetic (AI-generated) voice using spectrogram-based an
 
 ## full Architecture
 
-    Call ingress (Twilio / SIP / VoIP)
-            ↓
-    Realtime backend (WebSocket + API + orchestration)
-            ↓
-    ML inference service (chunking, spectrogram, model, risk)
-            ↓
-    Dashboard + storage + alerts
+        Call ingress (Twilio / SIP / VoIP)
+                ↓
+        Realtime backend orchestration
+                ↓
+        Inference layer
+        ├─ CNN branch
+        ├─ Wav2Vec2 branch
+        └─ Rule engine
+                ↓
+        Fusion + risk engine
+                ↓
+        Dashboard + storage + alerts
