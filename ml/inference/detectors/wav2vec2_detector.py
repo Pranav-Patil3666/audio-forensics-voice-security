@@ -17,7 +17,7 @@ class Wav2Vec2Detector(BaseDetector):
     Wav2Vec2 detector aligned with:
       - ml/wav2vec/wav2vec_dataset.py
       - 16kHz raw waveform input
-      - 4 sec fixed-length input
+      - 2 sec fixed-length input
       - binary REAL/FAKE classification
     """
 

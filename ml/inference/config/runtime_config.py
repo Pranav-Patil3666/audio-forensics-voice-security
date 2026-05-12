@@ -13,7 +13,7 @@ class RuntimeConfig:
     cnn_chunk_duration_sec: float = env_float("SATARKRAHE_CNN_CHUNK_DURATION_SEC", 2.0)
     cnn_chunk_overlap_sec: float = env_float("SATARKRAHE_CNN_CHUNK_OVERLAP_SEC", 1.0)
 
-    wav2vec2_duration_sec: float = env_float("SATARKRAHE_WAV2VEC2_DURATION_SEC", 4.0)
+    wav2vec2_duration_sec: float = env_float("SATARKRAHE_WAV2VEC2_DURATION_SEC", 2.0)
 
     vad_aggressiveness: int = env_int("SATARKRAHE_VAD_AGGRESSIVENESS", 2)
     vad_frame_ms: int = env_int("SATARKRAHE_VAD_FRAME_MS", 30)
