@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict
 
 import librosa
 import numpy as np
@@ -11,7 +11,7 @@ import torch
 from ..config import PATHS, THRESHOLDS, RUNTIME
 from ..schemas import AudioLabel
 from ..utils.audio import load_audio, pad_or_trim, audio_duration
-from .base_detector import BaseDetector
+from .base_detector import BaseDetector , RawPrediction
 
 # Make ml/src importable for CNNModel
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -95,7 +95,7 @@ class CNNDetector(BaseDetector):
         }
         return x, meta
 
-    def _predict_raw(self, file_path: Path) -> Tuple[float, float, Dict[str, Any]]:
+    def _predict_raw(self, file_path: Path) -> RawPrediction:
         x, meta = self._audio_to_tensor(file_path)
         x = x.to(self.device)
 
@@ -113,4 +113,9 @@ class CNNDetector(BaseDetector):
             }
         )
 
-        return real_prob, fake_prob, meta
+        return RawPrediction(
+            real_prob=real_prob,
+            fake_prob=fake_prob,
+            skip=False,
+            meta=meta,
+        )
