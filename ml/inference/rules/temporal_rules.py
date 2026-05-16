@@ -112,7 +112,23 @@ def evaluate_temporal_consistency(
 
     streak_score = _clamp01(high_hits / max(1, THRESHOLDS.fake_high_count_min_hits))
     medium_score = _clamp01(medium_hits / max(1, len(probs_arr)))
-    trend_score = _clamp01(max(0.0, float(probs_arr[-1] - probs_arr[0])))
+    
+    if len(probs_arr) >= 3:
+        x = np.arange(len(probs_arr), dtype=np.float32)
+        slope = float(np.polyfit(x, probs_arr, 1)[0])
+        trend_score = _clamp01(max(0.0, slope * len(probs_arr)))
+    else:
+        trend_score = _clamp01(max(0.0, float(probs_arr[-1] - probs_arr[0])))
+        
+    
+    # After trend_score calculation, add:
+    regime_shift = 0.0
+    if len(probs_arr) >= 6:
+        mid = len(probs_arr) // 2
+        early_mean = float(np.mean(probs_arr[:mid]))
+        late_mean  = float(np.mean(probs_arr[mid:]))
+        regime_shift = _clamp01(max(0.0, late_mean - early_mean) * 2.0)
+        
     spike_delta = float(np.max(np.abs(np.diff(probs_arr)))) if len(probs_arr) >= 2 else 0.0
     spike_score = _clamp01((spike_delta - THRESHOLDS.spike_delta) / max(1e-8, 1.0 - THRESHOLDS.spike_delta))
 
@@ -127,11 +143,13 @@ def evaluate_temporal_consistency(
     persistent_fake_score = _clamp01(fake_streak / max(1, THRESHOLDS.fake_high_count_min_hits))
 
     score = (
-        0.30 * streak_score
+        0.25 * streak_score
         + 0.20 * medium_score
         + 0.20 * spike_score
-        + 0.15 * trend_score
-        + 0.15 * oscillation_score
+        + 0.10 * trend_score
+        + 0.10 * oscillation_score
+        + 0.10 * persistent_fake_score
+        + 0.05 * regime_shift   
     )
 
     if fake_streak >= THRESHOLDS.fake_high_count_min_hits:
@@ -144,6 +162,7 @@ def evaluate_temporal_consistency(
         "trend_score": float(trend_score),
         "oscillation_score": float(oscillation_score),
         "persistent_fake_score": float(persistent_fake_score),
+        "regime_shift": float(regime_shift),
     }
 
     reasons: List[str] = []
@@ -159,6 +178,8 @@ def evaluate_temporal_consistency(
         reasons.append("rising_fake_trend")
     if fake_streak >= THRESHOLDS.fake_high_count_min_hits:
         reasons.append("fake_streak")
+    if regime_shift >= 0.30:
+        reasons.append("regime_shift_clean_to_suspicious")
 
     details = {
         "window": window,
@@ -171,6 +192,7 @@ def evaluate_temporal_consistency(
         "spike_delta": float(spike_delta),
         "flips": flips,
         "smoothed_fake_prob": float(session_state.smoothed_fake_prob),
+        "regime_shift": float(regime_shift)
     }
 
     return TemporalRuleResult(
