@@ -7,7 +7,7 @@ from typing import Dict
 
 from ._base import env_float, safe_div
 
-from inference.schemas.ensemble_schema import EnsembleWeights
+from ..schemas.ensemble_schema import EnsembleWeights
 
 
 @dataclass(slots=True)
