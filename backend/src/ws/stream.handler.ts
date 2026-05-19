@@ -82,17 +82,17 @@ export const initWebSocket = (server: any) => {
           return;
         }
 
-        const fakeProb = result.fake_prob ?? result.final?.fake_prob ?? 0;
+        const fakeProb = result.final?.fake_prob ?? result.final?.fake_prob ?? 0;
 
         // Temporary backend-side rolling view for the dashboard.
         // The authoritative decision still comes from the inference service.
         const rollingRisk = riskEngine.addPrediction(fakeProb);
 
-        const finalLabel = result.final?.label ?? result.label ?? "UNKNOWN";
-        const finalConfidence = result.final?.confidence ?? result.confidence ?? 0;
-        const finalRisk = result.final?.risk ?? result.risk ?? rollingRisk;
-        const finalRealProb = result.final?.real_prob ?? result.real_prob ?? 0;
-        const finalFakeProb = result.final?.fake_prob ?? result.fake_prob ?? 0;
+        const finalLabel = result.final?.label ?? result.final?.label ?? "UNKNOWN";
+        const finalConfidence = result.final?.confidence ?? result.final?.confidence ?? 0;
+        const finalRisk = result.final?.risk ?? result.final?.risk ?? rollingRisk;
+        const finalRealProb = result.final?.real_prob ?? result.final?.real_prob ?? 0;
+        const finalFakeProb = result.final?.fake_prob ?? result.final?.fake_prob ?? 0;
 
         ws.send(
           JSON.stringify({
@@ -105,7 +105,7 @@ export const initWebSocket = (server: any) => {
             risk: finalRisk,
             real_prob: finalRealProb,
             fake_prob: finalFakeProb,
-            threshold: result.final?.threshold ?? result.threshold ?? 0.5,
+            threshold: result.final?.threshold ?? result.final?.threshold ?? 0.5,
             stats: riskEngine.getStats(),
             session_summary: result.session_summary,
             cnn: result.cnn,
