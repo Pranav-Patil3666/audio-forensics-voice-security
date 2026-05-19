@@ -14,6 +14,13 @@ function safeUnlink(filePath: string) {
   }
 }
 
+function normalizeChunkIndex(value: unknown, fallback: number): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  return fallback;
+}
+
 export const initWebSocket = (server: any) => {
   const wss = new WebSocketServer({ server });
 
@@ -25,12 +32,13 @@ export const initWebSocket = (server: any) => {
     const sessionId = randomUUID();
     const riskEngine = new RiskEngine();
     let localChunkIndex = 0;
-    let callId: string | undefined = undefined;
+    let callId = sessionId;
 
     ws.send(
       JSON.stringify({
         type: "session",
         sessionId,
+        callId,
       })
     );
 
@@ -47,18 +55,20 @@ export const initWebSocket = (server: any) => {
           ws.send(
             JSON.stringify({
               type: "error",
-              message: "Missing filePath",
               sessionId,
+              message: "Missing filePath",
             })
           );
           return;
         }
 
-        callId = data.callId ?? callId ?? sessionId;
-        const chunkIndex =
-          typeof data.chunkIndex === "number"
-            ? data.chunkIndex
-            : localChunkIndex++;
+        callId =
+          typeof data.callId === "string" && data.callId.trim().length > 0
+            ? data.callId.trim()
+            : callId;
+
+        const chunkIndex = normalizeChunkIndex(data.chunkIndex, localChunkIndex);
+        localChunkIndex = chunkIndex + 1;
 
         const result = await sendToML(filePath, {
           sessionId,
@@ -66,7 +76,9 @@ export const initWebSocket = (server: any) => {
           chunkIndex,
         });
 
-        if (!result || result.skip) {
+        if (!result || result.skip || result.skipped || result.final?.skipped) {
+          const stats = riskEngine.registerSkip(sessionId, callId);
+
           safeUnlink(filePath);
 
           ws.send(
@@ -76,23 +88,36 @@ export const initWebSocket = (server: any) => {
               callId,
               chunkIndex,
               skip: true,
-              skip_reason: result?.skip_reason ?? "non_speech_or_unusable_chunk",
+              skip_reason:
+                result?.skip_reason ??
+                result?.raw?.skip_reason ??
+                "non_speech_or_unusable_chunk",
+              stats,
+              session_summary: result?.session_summary ?? null,
             })
           );
+
           return;
         }
 
-        const fakeProb = result.final?.fake_prob ?? result.final?.fake_prob ?? 0;
+        const final = result.final ?? {
+          label: "UNKNOWN",
+          confidence: 0,
+          real_prob: 0,
+          fake_prob: 0,
+          risk: "UNKNOWN",
+          threshold: 0.5,
+          skipped: false,
+        };
 
-        // Temporary backend-side rolling view for the dashboard.
-        // The authoritative decision still comes from the inference service.
-        const rollingRisk = riskEngine.addPrediction(fakeProb);
+        const backendRisk = riskEngine.update(sessionId, final.fake_prob, {
+          callId,
+          chunkIndex,
+          label: final.label,
+          inferenceRisk: final.risk,
+        });
 
-        const finalLabel = result.final?.label ?? result.final?.label ?? "UNKNOWN";
-        const finalConfidence = result.final?.confidence ?? result.final?.confidence ?? 0;
-        const finalRisk = result.final?.risk ?? result.final?.risk ?? rollingRisk;
-        const finalRealProb = result.final?.real_prob ?? result.final?.real_prob ?? 0;
-        const finalFakeProb = result.final?.fake_prob ?? result.final?.fake_prob ?? 0;
+        const sessionStats = backendRisk.stats;
 
         ws.send(
           JSON.stringify({
@@ -100,29 +125,46 @@ export const initWebSocket = (server: any) => {
             sessionId,
             callId,
             chunkIndex,
-            label: finalLabel,
-            confidence: finalConfidence,
-            risk: finalRisk,
-            real_prob: finalRealProb,
-            fake_prob: finalFakeProb,
-            threshold: result.final?.threshold ?? result.final?.threshold ?? 0.5,
-            stats: riskEngine.getStats(),
-            session_summary: result.session_summary,
-            cnn: result.cnn,
-            wav2vec2: result.wav2vec2,
-            rules: result.rules,
-            ensemble: result.ensemble,
-            final: result.final,
-            raw: result.raw,
+
+            // canonical fused decision
+            label: final.label,
+            confidence: final.confidence,
+            real_prob: final.real_prob,
+            fake_prob: final.fake_prob,
+
+            // authoritative model/fusion threshold
+            threshold: final.threshold,
+
+            // inference-side risk + backend trend risk
+            risk: backendRisk.risk,
+            backend_risk: backendRisk.backendRisk,
+
+            // legacy compatibility / UI support
+            stats: sessionStats,
+            session_summary: result.session_summary ?? null,
+
+            // rich breakdown
+            audio_rule: result.audio_rule ?? null,
+            cnn: result.cnn ?? null,
+            wav2vec2: result.wav2vec2 ?? null,
+            rules: result.rules ?? null,
+            ensemble: result.ensemble ?? null,
+
+            thresholds: result.thresholds ?? null,
+            ensemble_weights: result.ensemble_weights ?? null,
+            request: result.request ?? null,
+            raw: result.raw ?? result,
           })
         );
 
         safeUnlink(filePath);
       } catch (err) {
         console.error("❌ WS error:", err);
+
         ws.send(
           JSON.stringify({
             type: "error",
+            sessionId,
             message: "WebSocket processing failed",
           })
         );
